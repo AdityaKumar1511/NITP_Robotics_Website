@@ -1,5 +1,4 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
 const Card = React.forwardRef<
@@ -9,7 +8,16 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
+      // Base
       "rounded-lg border bg-card text-card-foreground shadow-sm",
+      // Premium hover — subtle lift + border brightening + top shimmer line
+      "relative overflow-hidden transition-all duration-300",
+      "hover:border-border hover:shadow-md hover:shadow-black/5 hover:-translate-y-px",
+      // Top shimmer line that reveals on hover
+      "before:absolute before:inset-x-0 before:top-0 before:h-px",
+      "before:bg-gradient-to-r before:from-transparent before:via-primary/30 before:to-transparent",
+      "before:opacity-0 before:transition-opacity before:duration-500",
+      "hover:before:opacity-100",
       className
     )}
     {...props}
