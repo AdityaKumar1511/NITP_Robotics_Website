@@ -1,6 +1,6 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 
 const faqs = [
   {
@@ -9,7 +9,7 @@ const faqs = [
   },
   {
     q: 'Do I need prior robotics experience?',
-    a: 'Not at all. We run beginner-friendly workshops at the start of each semester covering electronics, programming, and mechanical basics. You\'ll be assigned a mentor to guide you.',
+    a: "Not at all. We run beginner-friendly workshops at the start of each semester covering electronics, programming, and mechanical basics. You'll be assigned a mentor to guide you.",
   },
   {
     q: 'What is the time commitment?',
@@ -25,25 +25,78 @@ const faqs = [
   },
 ];
 
-function FAQItem({ item, isOpen, onToggle }: { item: typeof faqs[0]; isOpen: boolean; onToggle: () => void }) {
+function FAQItem({
+  item,
+  isOpen,
+  onToggle,
+  index,
+}: {
+  item: (typeof faqs)[0];
+  isOpen: boolean;
+  onToggle: () => void;
+  index: number;
+}) {
   return (
-    <div className="border-b border-border/60 last:border-0">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.07 }}
+      className={`group border-b border-border/60 last:border-0 transition-colors duration-300 ${isOpen ? 'border-primary/20' : ''}`}
+    >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-6 text-left group"
+        className="w-full flex items-center justify-between py-6 text-left"
       >
-        <span className="font-heading font-semibold text-base pr-8 group-hover:text-primary transition-colors">{item.q}</span>
-        <ChevronDown className={`w-5 h-5 text-muted-foreground flex-shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        {/* Question */}
+        <span
+          className={`font-heading font-semibold text-base pr-8 transition-colors duration-300 ${
+            isOpen ? 'text-primary' : 'group-hover:text-primary'
+          }`}
+        >
+          {item.q}
+        </span>
+
+        {/* Icon — morphs between plus and chevron */}
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+          className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 ${
+            isOpen
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
+          }`}
+        >
+          <ChevronDown className="w-4 h-4" />
+        </motion.div>
       </button>
-      <motion.div
-        initial={false}
-        animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="overflow-hidden"
-      >
-        <p className="pb-6 text-muted-foreground leading-relaxed pr-12">{item.a}</p>
-      </motion.div>
-    </div>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            {/* Animated left accent bar */}
+            <div className="flex gap-4 pb-6 pr-12">
+              <motion.div
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                exit={{ scaleY: 0 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+                className="w-0.5 flex-shrink-0 bg-gradient-to-b from-primary to-primary/20 rounded-full origin-top"
+                style={{ minHeight: '100%' }}
+              />
+              <p className="text-muted-foreground leading-relaxed">{item.a}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -54,8 +107,8 @@ export function FAQSection() {
     <section className="section-padding relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 max-w-6xl mx-auto">
-          {/* Left — Header */}
-          <div>
+          {/* Left — sticky header */}
+          <div className="lg:sticky lg:top-28 lg:self-start">
             <motion.span
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -83,14 +136,21 @@ export function FAQSection() {
             >
               Everything you need to know about joining and participating in the Robotics Club at NIT Patna.
             </motion.p>
+
+            {/* Decorative element */}
+            <div className="mt-10 hidden lg:flex items-center gap-3 text-sm text-muted-foreground/50">
+              <span className="text-2xl font-heading font-bold text-primary/20">{faqs.length}</span>
+              <span>questions answered</span>
+            </div>
           </div>
 
-          {/* Right — Accordion */}
+          {/* Right — accordion */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
+            className="rounded-2xl bg-card/50 border border-border/40 p-6 sm:p-8"
           >
             {faqs.map((item, i) => (
               <FAQItem
@@ -98,6 +158,7 @@ export function FAQSection() {
                 item={item}
                 isOpen={openIndex === i}
                 onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+                index={i}
               />
             ))}
           </motion.div>

@@ -1,147 +1,144 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, useSpring } from 'framer-motion';
 
 export function CursorFollower() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
+  const [isClicking, setIsClicking] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
-  const springConfig = { damping: 25, stiffness: 150, mass: 0.5 };
-  const cursorX = useSpring(0, springConfig);
-  const cursorY = useSpring(0, springConfig);
+  const springFast = { damping: 28, stiffness: 200, mass: 0.4 };
+  const springMed  = { damping: 32, stiffness: 140, mass: 0.6 };
+  const springSlow = { damping: 38, stiffness: 90,  mass: 0.8 };
+
+  const cursorX = useSpring(0, springFast);
+  const cursorY = useSpring(0, springFast);
+  const ringX   = useSpring(0, springMed);
+  const ringY   = useSpring(0, springMed);
+  const trailX  = useSpring(0, springSlow);
+  const trailY  = useSpring(0, springSlow);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
+    const onMove = (e: MouseEvent) => {
       cursorX.set(e.clientX);
       cursorY.set(e.clientY);
+      ringX.set(e.clientX);
+      ringY.set(e.clientY);
+      trailX.set(e.clientX);
+      trailY.set(e.clientY);
+      if (!isVisible) setIsVisible(true);
     };
 
-    const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const isInteractive = !!
-        (target.tagName === 'A' || 
-        target.tagName === 'BUTTON' || 
-        target.closest('a') || 
-        target.closest('button') ||
-        target.classList.contains('cursor-pointer'));
-      
-      setIsHovering(isInteractive);
+    const onOver = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      setIsHovering(
+        t.tagName === 'A' ||
+        t.tagName === 'BUTTON' ||
+        !!t.closest('a') ||
+        !!t.closest('button') ||
+        t.classList.contains('cursor-pointer')
+      );
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseover', handleMouseOver);
+    const onDown = () => setIsClicking(true);
+    const onUp   = () => setIsClicking(false);
+    const onLeave = () => setIsVisible(false);
+    const onEnter = () => setIsVisible(true);
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseover', onOver);
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup', onUp);
+    document.documentElement.addEventListener('mouseleave', onLeave);
+    document.documentElement.addEventListener('mouseenter', onEnter);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseover', handleMouseOver);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseover', onOver);
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mouseup', onUp);
+      document.documentElement.removeEventListener('mouseleave', onLeave);
+      document.documentElement.removeEventListener('mouseenter', onEnter);
     };
-  }, [cursorX, cursorY]);
+  }, [cursorX, cursorY, ringX, ringY, trailX, trailY, isVisible]);
+
+  if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches) {
+    return null;
+  }
 
   return (
     <>
-      {/* Main cursor dot */}
+      {/* Dot — sharpest tracking */}
       <motion.div
         className="fixed top-0 left-0 pointer-events-none z-[9999] mix-blend-difference"
-        style={{
-          x: cursorX,
-          y: cursorY,
-        }}
+        style={{ x: cursorX, y: cursorY }}
+        animate={{ opacity: isVisible ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
       >
         <motion.div
-          className="relative -translate-x-1/2 -translate-y-1/2"
+          className="-translate-x-1/2 -translate-y-1/2"
           animate={{
-            scale: isHovering ? 1.5 : 1,
+            scale: isClicking ? 0.6 : isHovering ? 1.8 : 1,
           }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
         >
-          <div className="w-2 h-2 bg-white rounded-full" />
+          <div className="w-2.5 h-2.5 bg-white rounded-full" />
         </motion.div>
       </motion.div>
 
-      {/* Outer ring */}
+      {/* Ring — medium lag */}
       <motion.div
         className="fixed top-0 left-0 pointer-events-none z-[9998]"
-        style={{
-          x: cursorX,
-          y: cursorY,
-        }}
+        style={{ x: ringX, y: ringY }}
+        animate={{ opacity: isVisible ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
       >
         <motion.div
-          className="relative -translate-x-1/2 -translate-y-1/2"
+          className="-translate-x-1/2 -translate-y-1/2"
           animate={{
-            scale: isHovering ? 1.8 : 1,
-            opacity: isHovering ? 0.6 : 0.3,
+            scale: isClicking ? 0.7 : isHovering ? 2.2 : 1,
+            opacity: isHovering ? 0.8 : 0.35,
           }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
         >
-          <div className="w-10 h-10 border-2 border-primary rounded-full" />
+          <div className={`w-10 h-10 rounded-full border-2 transition-colors duration-300 ${isHovering ? 'border-primary' : 'border-primary/60'}`} />
         </motion.div>
       </motion.div>
 
-      {/* Glowing trail effect */}
+      {/* Ambient glow — slowest, most diffuse */}
       <motion.div
         className="fixed top-0 left-0 pointer-events-none z-[9997]"
-        style={{
-          x: mousePosition.x,
-          y: mousePosition.y,
-        }}
-        transition={{ type: "spring", damping: 30, stiffness: 100 }}
+        style={{ x: trailX, y: trailY }}
+        animate={{ opacity: isVisible ? 1 : 0 }}
+        transition={{ duration: 0.4 }}
       >
-        <div className="relative -translate-x-1/2 -translate-y-1/2">
-          <motion.div
-            className="w-20 h-20 bg-primary/20 rounded-full blur-xl"
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.5, 0.3],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-        </div>
+        <motion.div
+          className="-translate-x-1/2 -translate-y-1/2"
+          animate={{
+            scale: isHovering ? 1.5 : 1,
+            opacity: isHovering ? 0.7 : 0.4,
+          }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+        >
+          <div className="w-24 h-24 bg-primary/15 rounded-full blur-2xl" />
+        </motion.div>
       </motion.div>
 
-      {/* Particles effect */}
-      {[...Array(3)].map((_, i) => (
+      {/* Click ripple */}
+      {isClicking && (
         <motion.div
-          key={i}
           className="fixed top-0 left-0 pointer-events-none z-[9996]"
-          style={{
-            x: cursorX,
-            y: cursorY,
-          }}
-          transition={{ 
-            type: "spring", 
-            damping: 20 + i * 5, 
-            stiffness: 80 - i * 10,
-            mass: 0.8 + i * 0.2
-          }}
+          style={{ x: cursorX, y: cursorY }}
         >
           <motion.div
-            className="relative -translate-x-1/2 -translate-y-1/2"
-            animate={{
-              scale: [1, 1.5, 1],
-              opacity: [0.6, 0, 0.6],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: 3 + i,
-              repeat: Infinity,
-              ease: "linear",
-              delay: i * 0.3,
-            }}
+            className="-translate-x-1/2 -translate-y-1/2"
+            initial={{ scale: 0.5, opacity: 0.6 }}
+            animate={{ scale: 3, opacity: 0 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
           >
-            <div 
-              className="w-1 h-1 bg-gradient-to-r from-primary to-purple-500 rounded-full"
-              style={{
-                transform: `translate(${Math.cos(i * 2) * 20}px, ${Math.sin(i * 2) * 20}px)`,
-              }}
-            />
+            <div className="w-8 h-8 rounded-full border border-primary/50" />
           </motion.div>
         </motion.div>
-      ))}
+      )}
     </>
   );
 }
