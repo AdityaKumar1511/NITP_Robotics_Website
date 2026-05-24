@@ -1,5 +1,57 @@
 [
   {
+    "id": 13,
+    "title": "HydronX Underwater Robot",
+    "description": "",
+    "detailedDescription": "",
+    "image": "",
+    "category": "Autonomous",
+    "tags": [],
+    "github": "",
+    "demo": "",
+    "status": "Ongoing",
+    "featured": false
+  },
+  {
+    "id": 12,
+    "title": "ArionX Autonomous Drone",
+    "description": "",
+    "detailedDescription": "",
+    "image": "",
+    "category": "Autonomous",
+    "tags": [],
+    "github": "",
+    "demo": "",
+    "status": "Ongoing",
+    "featured": false
+  },
+  {
+    "id": 11,
+    "title": "TerronX Autonomous Rover",
+    "description": "",
+    "detailedDescription": "",
+    "image": "",
+    "category": "Autonomous",
+    "tags": [],
+    "github": "",
+    "demo": "",
+    "status": "Ongoing",
+    "featured": false
+  },
+  {
+    "id": 10,
+    "title": "KinetonX Autonomous Racing Robot",
+    "description": "",
+    "detailedDescription": "",
+    "image": "",
+    "category": "Autonomous",
+    "tags": [],
+    "github": "",
+    "demo": "",
+    "status": "Ongoing",
+    "featured": true
+  },
+  {
     "id": 9,
     "title": "Automated Bot",
     "description": "A wall-following autonomous bot that maintains distance, detects parcel boxes, counts laps via IR strip sensing, and displays stats on an LCD.",
