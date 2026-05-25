@@ -5,10 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Github, ExternalLink, ArrowRight, Sparkles, X, ZoomIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getProjects, getProjectCategories, getFeaturedProjects } from '@/data';
+import { useCategoryFromNav } from '@/hooks/useCategoryFromNav';
+
 
 export function ProjectsPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+  // Wire up submenu navigation
+  useCategoryFromNav(setSelectedCategory);
 
   const getExternalUrl = (url?: string) => {
     if (!url) return null;
@@ -235,7 +240,7 @@ export function ProjectsPage() {
       )}
 
       {/* Filters */}
-      <section className="py-16">
+      <section id="category-filter" className="py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
