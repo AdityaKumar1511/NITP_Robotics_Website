@@ -1,28 +1,172 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Sun, Moon } from 'lucide-react';
+import { Menu, X, Sun, Moon, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 import { NotificationMenu } from '@/components/NotificationMenu';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+type SubmenuItem =
+  | { label: string; path: string; type: 'hash'; hash: string }
+  | { label: string; path: string; type: 'category'; category: string }
+  | { label: string; path: string; type: 'link' };
+
+// ─── Submenu config ───────────────────────────────────────────────────────────
+// Team  → scroll-to-section (type: 'hash')
+// Projects / Events / Gallery → category filter (type: 'category')
+const submenus: Record<string, SubmenuItem[]> = {
+  '/team': [
+    { label: 'Professor In Charge', path: '/team', type: 'hash', hash: 'professor-in-charge' },
+    { label: 'Executive Committee', path: '/team', type: 'hash', hash: 'executive-committee' },
+    { label: 'Core Team',           path: '/team', type: 'hash', hash: 'core-team'           },
+    { label: 'Active Members',      path: '/team', type: 'hash', hash: 'active-members'      },
+  ],
+  '/projects': [
+    { label: 'All',         path: '/projects', type: 'category', category: 'All'         },
+    { label: 'Autonomous',  path: '/projects', type: 'category', category: 'Autonomous'  },
+    { label: 'Robotics',    path: '/projects', type: 'category', category: 'Robotics'    },
+    { label: 'Drone',       path: '/projects', type: 'category', category: 'Drone'       },
+    { label: 'Fabrication', path: '/projects', type: 'category', category: 'Fabrication' },
+    { label: 'Navigation',  path: '/projects', type: 'category', category: 'Navigation'  },
+  ],
+  '/events': [
+    { label: 'All',         path: '/events', type: 'category', category: 'All'         },
+    { label: 'Competition', path: '/events', type: 'category', category: 'Competition' },
+    { label: 'Hackathon',   path: '/events', type: 'category', category: 'Hackathon'   },
+    { label: 'Orientation', path: '/events', type: 'category', category: 'Orientation' },
+    { label: 'Workshop',    path: '/events', type: 'category', category: 'Workshop'    },
+    { label: 'Fest',        path: '/events', type: 'category', category: 'Fest'        },
+  ],
+  '/gallery': [
+    { label: 'All',          path: '/gallery', type: 'category', category: 'All'          },
+    { label: 'Competitions', path: '/gallery', type: 'category', category: 'Competitions' },
+    { label: 'Workshops',    path: '/gallery', type: 'category', category: 'Workshops'    },
+    { label: 'Events',       path: '/gallery', type: 'category', category: 'Events'       },
+    { label: 'Team',         path: '/gallery', type: 'category', category: 'Team'         },
+  ],
+};
+
 const navItems = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
-  { name: 'Team', path: '/team' },
-  { name: 'Projects', path: '/projects' },
-  { name: 'Events', path: '/events' },
-  { name: 'Awards', path: '/awards' },
-  { name: 'Gallery', path: '/gallery' },
-  { name: 'Contact', path: '/contact' },
+  { name: 'Home',     path: '/'        },
+  { name: 'About',    path: '/about'   },
+  { name: 'Team',     path: '/team'    },
+  { name: 'Projects', path: '/projects'},
+  { name: 'Events',   path: '/events'  },
+  { name: 'Awards',   path: '/awards'  },
+  { name: 'Gallery',  path: '/gallery' },
+  { name: 'Contact',  path: '/contact' },
 ];
 
+// ─── Shared click handler logic ───────────────────────────────────────────────
+function useSubmenuClick(onSelect: () => void) {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+
+  return function handleClick(item: SubmenuItem) {
+    onSelect();
+
+    if (item.type === 'category') {
+      if (location.pathname === item.path) {
+        // Same page → dispatch event so the page updates instantly
+        window.dispatchEvent(
+          new CustomEvent('submenu-set-category', { detail: item.category }),
+        );
+      } else {
+        // Different page → navigate with ?category= search param (reliable across all cases)
+        navigate(`${item.path}?category=${encodeURIComponent(item.category)}`);
+      }
+      return;
+    }
+
+    if (item.type === 'hash') {
+      if (location.pathname === item.path) {
+        // Same page → scroll directly
+        const el = document.getElementById(item.hash);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // Different page → store hash, navigate
+        sessionStorage.setItem('scrollToHash', item.hash);
+        navigate(item.path);
+      }
+      return;
+    }
+
+    // type === 'link'
+    navigate(item.path);
+  };
+}
+
+// ─── Desktop Submenu Dropdown ─────────────────────────────────────────────────
+function SubmenuDropdown({
+  items,
+  onSelect,
+}: {
+  items: SubmenuItem[];
+  onSelect: () => void;
+}) {
+  const handleClick = useSubmenuClick(onSelect);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 6, scale: 0.97 }}
+      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 min-w-[190px] rounded-2xl border border-border/60 bg-card/95 backdrop-blur-2xl shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden z-50"
+    >
+      {/* Top accent line */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+      <div className="p-1.5">
+        {items.map((item, i) => (
+          <motion.button
+            key={item.label}
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.15, delay: i * 0.03 }}
+            onClick={() => handleClick(item)}
+            className="w-full text-left px-4 py-2.5 text-sm font-medium rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/70 transition-all duration-200 relative overflow-hidden group"
+          >
+            {/* Shimmer sweep */}
+            <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-primary/5 to-transparent transition-transform duration-500" />
+            <span className="relative">{item.label}</span>
+          </motion.button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Mobile Submenu Item ──────────────────────────────────────────────────────
+function MobileSubmenuItem({
+  item,
+  onSelect,
+}: {
+  item: SubmenuItem;
+  onSelect: () => void;
+}) {
+  const handleClick = useSubmenuClick(onSelect);
+
+  return (
+    <button
+      onClick={() => handleClick(item)}
+      className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-lg transition-all duration-200"
+    >
+      {item.label}
+    </button>
+  );
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────────
 export function Header() {
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isScrolled, setIsScrolled]             = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const location = useLocation();
-  const { resolvedTheme, setTheme } = useTheme();
+  const [openSubmenu, setOpenSubmenu]           = useState<string | null>(null);
+  const hoverTimerRef                           = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const location                                = useLocation();
+  const { resolvedTheme, setTheme }             = useTheme();
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -30,11 +174,30 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Close menus on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [location]);
+    setOpenSubmenu(null);
+  }, [location.pathname]);
 
   const toggleTheme = () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+
+  function handleNavMouseEnter(path: string) {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    if (submenus[path]) setOpenSubmenu(path);
+  }
+
+  function handleNavMouseLeave() {
+    hoverTimerRef.current = setTimeout(() => setOpenSubmenu(null), 120);
+  }
+
+  function handleDropdownMouseEnter() {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }
+
+  function handleDropdownMouseLeave() {
+    hoverTimerRef.current = setTimeout(() => setOpenSubmenu(null), 120);
+  }
 
   return (
     <motion.header
@@ -58,7 +221,7 @@ export function Header() {
               whileHover={{ scale: 1.08, rotate: 3 }}
               whileTap={{ scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              className="relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-300"
+              className="relative w-11 h-11 rounded-2xl flex items-center justify-center"
             >
               <img src="/assets/logo.png" alt="Robotics Club Logo" className="w-full h-full object-contain" />
             </motion.div>
@@ -71,49 +234,78 @@ export function Header() {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-1 bg-background/40 backdrop-blur-md rounded-2xl px-2 py-1.5 border border-border/50 shadow-sm">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive      = location.pathname === item.path;
+              const hasSubmenu    = Boolean(submenus[item.path]);
+              const isSubmenuOpen = openSubmenu === item.path;
+
               return (
-                <Link key={item.path} to={item.path}>
-                  <motion.div
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        'relative text-sm font-medium transition-all duration-300 rounded-xl px-4 h-9 overflow-hidden group',
-                        isActive
-                          ? 'text-foreground bg-primary/10 shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                      )}
-                    >
-                      {/* Shimmer on hover for inactive items */}
-                      {!isActive && (
-                        <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-primary/5 to-transparent transition-transform duration-500 ease-in-out" />
-                      )}
+                <div
+                  key={item.path}
+                  className="relative"
+                  onMouseEnter={() => handleNavMouseEnter(item.path)}
+                  onMouseLeave={handleNavMouseLeave}
+                >
+                  <Link to={item.path} tabIndex={-1}>
+                    <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          'relative text-sm font-medium transition-all duration-300 rounded-xl h-9 overflow-hidden group',
+                          hasSubmenu ? 'px-3' : 'px-4',
+                          isActive
+                            ? 'text-foreground bg-primary/10 shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                        )}
+                      >
+                        {!isActive && (
+                          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-primary/5 to-transparent transition-transform duration-500 ease-in-out" />
+                        )}
+                        <span className="relative flex items-center gap-1">
+                          {item.name}
+                          {hasSubmenu && (
+                            <ChevronDown
+                              className={cn(
+                                'w-3.5 h-3.5 transition-transform duration-200',
+                                isSubmenuOpen ? 'rotate-180' : ''
+                              )}
+                            />
+                          )}
+                        </span>
+                        {isActive && (
+                          <motion.div
+                            layoutId="navbar-indicator"
+                            className="absolute inset-0 bg-primary/5 border border-primary/20 rounded-xl"
+                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                          />
+                        )}
+                      </Button>
+                    </motion.div>
+                  </Link>
 
-                      <span className="relative">{item.name}</span>
-
-                      {isActive && (
-                        <motion.div
-                          layoutId="navbar-indicator"
-                          className="absolute inset-0 bg-primary/5 border border-primary/20 rounded-xl"
-                          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  {/* Submenu dropdown */}
+                  <AnimatePresence>
+                    {hasSubmenu && isSubmenuOpen && (
+                      <div
+                        onMouseEnter={handleDropdownMouseEnter}
+                        onMouseLeave={handleDropdownMouseLeave}
+                      >
+                        <SubmenuDropdown
+                          items={submenus[item.path]}
+                          onSelect={() => setOpenSubmenu(null)}
                         />
-                      )}
-                    </Button>
-                  </motion.div>
-                </Link>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
               );
             })}
           </div>
 
-          {/* Right side controls */}
+          {/* Right controls */}
           <div className="flex items-center gap-6 relative z-10">
             <NotificationMenu isScrolled={isScrolled} />
 
-            {/* Theme Toggle */}
             <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}>
               <Button
                 variant="ghost"
@@ -126,27 +318,14 @@ export function Header() {
                 )}
                 aria-label="Toggle theme"
               >
-                {/* Ripple on click */}
                 <span className="absolute inset-0 rounded-xl bg-primary/10 scale-0 group-active:scale-100 transition-transform duration-200" />
                 <AnimatePresence mode="wait" initial={false}>
                   {resolvedTheme === 'dark' ? (
-                    <motion.div
-                      key="sun"
-                      initial={{ rotate: -90, opacity: 0, scale: 0.8 }}
-                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                      exit={{ rotate: 90, opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.3 }}
-                    >
+                    <motion.div key="sun" initial={{ rotate: -90, opacity: 0, scale: 0.8 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: 90, opacity: 0, scale: 0.8 }} transition={{ duration: 0.3 }}>
                       <Sun className="w-5 h-5 text-white" />
                     </motion.div>
                   ) : (
-                    <motion.div
-                      key="moon"
-                      initial={{ rotate: 90, opacity: 0, scale: 0.8 }}
-                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                      exit={{ rotate: -90, opacity: 0, scale: 0.8 }}
-                      transition={{ duration: 0.3 }}
-                    >
+                    <motion.div key="moon" initial={{ rotate: 90, opacity: 0, scale: 0.8 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: -90, opacity: 0, scale: 0.8 }} transition={{ duration: 0.3 }}>
                       <Moon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     </motion.div>
                   )}
@@ -154,7 +333,6 @@ export function Header() {
               </Button>
             </motion.div>
 
-            {/* Mobile Menu Button */}
             <motion.button
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.92 }}
@@ -168,23 +346,11 @@ export function Header() {
             >
               <AnimatePresence mode="wait">
                 {isMobileMenuOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
                     <X size={22} />
                   </motion.div>
                 ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <motion.div key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.2 }}>
                     <Menu size={22} />
                   </motion.div>
                 )}
@@ -202,11 +368,12 @@ export function Header() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-            className="lg:hidden bg-background/95 backdrop-blur-2xl border-b border-border/40 shadow-xl"
+            className="lg:hidden bg-background/95 backdrop-blur-2xl border-b border-border/40 shadow-xl overflow-y-auto max-h-[80vh]"
           >
-            <div className="container mx-auto px-4 py-6 space-y-1.5">
+            <div className="container mx-auto px-4 py-6 space-y-1">
               {navItems.map((item, index) => {
-                const isActive = location.pathname === item.path;
+                const isActive   = location.pathname === item.path;
+                const hasSubmenu = Boolean(submenus[item.path]);
                 return (
                   <motion.div
                     key={item.path}
@@ -214,7 +381,7 @@ export function Header() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.25, delay: index * 0.04 }}
                   >
-                    <Link to={item.path}>
+                    <Link to={item.path} onClick={() => setIsMobileMenuOpen(false)}>
                       <Button
                         variant="ghost"
                         className={cn(
@@ -227,12 +394,23 @@ export function Header() {
                         {!isActive && (
                           <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-primary/5 to-transparent transition-transform duration-500" />
                         )}
-                        {isActive && (
-                          <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary" />
-                        )}
+                        {isActive && <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-primary" />}
                         <span className="relative pl-1">{item.name}</span>
                       </Button>
                     </Link>
+
+                    {/* Mobile submenu items */}
+                    {hasSubmenu && (
+                      <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-border/50 pl-3">
+                        {submenus[item.path].map((sub) => (
+                          <MobileSubmenuItem
+                            key={sub.label}
+                            item={sub}
+                            onSelect={() => setIsMobileMenuOpen(false)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
